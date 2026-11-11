@@ -12,8 +12,8 @@
         .btn-success { background: #28a745; color: white; width: 100%; margin-top: 10px; }
         .btn-danger { background: #dc3545; color: white; }
         .btn:disabled { background: #cccccc; cursor: not-allowed; }
-        .controls { background: white; padding: 15px 25px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .control-group { flex: 1; }
+        .controls { background: white; padding: 15px 25px; border-radius: 8px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .control-group { flex: 1; min-width: 200px; }
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
         .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .card h3 { margin-top: 0; color: #0056b3; }
@@ -32,6 +32,10 @@
 
     <div id="lessonsSection">
         <div class="controls">
+            <div class="control-group">
+                <label><strong>Search Courses:</strong></label>
+                <input type="text" id="searchInput" placeholder="Search by subject or location..." oninput="renderLessons()">
+            </div>
             <div class="control-group">
                 <label><strong>Sort By:</strong></label>
                 <select id="sortBy" onchange="renderLessons()">
@@ -67,7 +71,7 @@
 </div>
 
 <script>
-const backendUrl = 'https://cst3144-backend-m01147369.onrender.com';
+const backendUrl = 'https://onrender.com';
 let lessons = [];
 let cart = [];
 let showLessons = true;
@@ -85,9 +89,16 @@ function fetchLessons() {
 }
 
 function renderLessons() {
+    const query = document.getElementById('searchInput').value.toLowerCase().trim();
     const sortBy = document.getElementById('sortBy').value;
     const sortOrder = document.getElementById('sortOrder').value;
-    const sorted = [...lessons].sort((a, b) => {
+
+    const filtered = lessons.filter(lesson =>
+        lesson.subject.toLowerCase().includes(query) ||
+        lesson.location.toLowerCase().includes(query)
+    );
+
+    const sorted = filtered.sort((a, b) => {
         let modifier = sortOrder === 'asc' ? 1 : -1;
         if (a[sortBy] < b[sortBy]) return -1 * modifier;
         if (a[sortBy] > b[sortBy]) return 1 * modifier;
@@ -95,6 +106,11 @@ function renderLessons() {
     });
 
     const grid = document.getElementById('lessonsGrid');
+    if (sorted.length === 0 && lessons.length > 0) {
+        grid.innerHTML = '<p>No courses match your search.</p>';
+        return;
+    }
+
     grid.innerHTML = sorted.map(lesson => `
         <div class="card">
             <h3>${lesson.subject}</h3>
