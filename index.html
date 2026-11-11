@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <title>University Module Portal</title>
-   <script src="https://vuejs.org"></script>
     <style>
         body { font-family: Arial, sans-serif; background: #f4f6f9; padding: 20px; margin: 0; }
         .container { max-width: 1100px; margin: 0 auto; }
@@ -18,26 +17,24 @@
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
         .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .card h3 { margin-top: 0; color: #0056b3; }
-        .cart-box { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .cart-box { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: none; }
         .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; }
         input, select { padding: 10px; width: 100%; margin-top: 5px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
     </style>
 </head>
 <body>
 
-<div id="app" class="container">
+<div class="container">
     <div class="header">
         <h2>University Course Portal</h2>
-        <button class="btn btn-primary" v-on:click="toggleCart" v-bind:disabled="cart.length === 0 && showLessons">
-            {{ showLessons ? 'View Cart (' + cart.length + ')' : 'Back to Courses' }}
-        </button>
+        <button id="cartToggleBtn" class="btn btn-primary" disabled onclick="toggleCart()">View Cart (0)</button>
     </div>
 
-    <div v-if="showLessons">
+    <div id="lessonsSection">
         <div class="controls">
             <div class="control-group">
                 <label><strong>Sort By:</strong></label>
-                <select v-model="sortBy">
+                <select id="sortBy" onchange="renderLessons()">
                     <option value="subject">Subject</option>
                     <option value="location">Location</option>
                     <option value="price">Price</option>
@@ -46,140 +43,163 @@
             </div>
             <div class="control-group">
                 <label><strong>Order:</strong></label>
-                <select v-model="sortOrder">
+                <select id="sortOrder" onchange="renderLessons()">
                     <option value="asc">Ascending (A-Z / Low-High)</option>
                     <option value="desc">Descending (Z-A / High-Low)</option>
                 </select>
             </div>
         </div>
-
-        <div class="grid">
-            <div class="card" v-for="lesson in sortedLessons" :key="lesson._id">
-                <h3>{{ lesson.subject }}</h3>
-                <p><strong>Location:</strong> {{ lesson.location }}</p>
-                <p><strong>Price:</strong> £{{ lesson.price }}</p>
-                <p><strong>Spaces Left:</strong> {{ lesson.spaces }}</p>
-                <button class="btn btn-success" v-on:click="addToCart(lesson)" v-bind:disabled="lesson.spaces === 0">
-                    {{ lesson.spaces > 0 ? 'Add to Cart' : 'Full' }}
-                </button>
-            </div>
-        </div>
+        <div id="lessonsGrid" class="grid">Loading courses from Render...</div>
     </div>
 
-    <div v-else class="cart-box">
+    <div id="cartSection" class="cart-box">
         <h3>Your Selected Courses</h3>
-        <p v-if="cart.length === 0">Your cart is empty.</p>
-        <div v-else>
-            <div class="cart-item" v-for="(item, index) in cart" :key="index">
-                <div><strong>{{ item.subject }}</strong> - {{ item.location }} (£{{ item.price }})</div>
-                <button class="btn btn-danger" v-on:click="removeFromCart(index, item)">Remove</button>
-            </div>
-
+        <div id="cartItems"></div>
+        <div id="checkoutForm" style="display:none;">
             <h4 style="margin-top: 25px;">Student Checkout & Sign-Up</h4>
             <label>Full Name (Letters only)</label>
-            <input type="text" v-model="customerName" placeholder="e.g. John Doe">
-
+            <input type="text" id="customerName" placeholder="e.g. John Doe" oninput="validateCheckout()">
             <label>Phone Number (Numbers only)</label>
-            <input type="text" v-model="customerPhone" placeholder="e.g. 07123456789">
-
-            <button class="btn btn-primary" v-on:click="submitCheckout" v-bind:disabled="!isCheckoutValid">
-                Complete Checkout
-            </button>
+            <input type="text" id="customerPhone" placeholder="e.g. 07123456789" oninput="validateCheckout()">
+            <button id="checkoutBtn" class="btn btn-primary" disabled onclick="submitCheckout()">Complete Checkout</button>
         </div>
     </div>
 </div>
 
 <script>
-new Vue({
-    el: '#app',
-    data: {
-        backendUrl:  'https://cst3144-backend-m01147369.onrender.com',
-        lessons: [],
-        cart: [],
-        showLessons: true,
-        sortBy: 'subject',
-        sortOrder: 'asc',
-        customerName: '',
-        customerPhone: ''
-    },
-    created() {
-        this.fetchLessons();
-    },
-    computed: {
-        sortedLessons() {
-            return [...this.lessons].sort((a, b) => {
-                let modifier = this.sortOrder === 'asc' ? 1 : -1;
-                if (a[this.sortBy] < b[this.sortBy]) return -1 * modifier;
-                if (a[this.sortBy] > b[this.sortBy]) return 1 * modifier;
-                return 0;
-            });
-        },
-        isCheckoutValid() {
-            const nameRegex = /^[A-Za-z\s]+$/;
-            const phoneRegex = /^[0-9]+$/;
-            return nameRegex.test(this.customerName.trim()) && phoneRegex.test(this.customerPhone.trim());
-        }
-    },
-    methods: {
-        fetchLessons() {
-            fetch(`${this.backendUrl}/lessons`)
-                .then(res => res.json())
-                .then(data => {
-                    this.lessons = data;
-                })
-                .catch(err => console.error("Error fetching lessons:", err));
-        },
-        addToCart(lesson) {
-            if (lesson.spaces > 0) {
-                lesson.spaces--;
-                this.cart.push(lesson);
-            }
-        },
-        removeFromCart(index, item) {
-            this.cart.splice(index, 1);
-            const found = this.lessons.find(l => l._id === item._id);
-            if (found) found.spaces++;
-        },
-        toggleCart() {
-            this.showLessons = !this.showLessons;
-        },
-        submitCheckout() {
-            const orderData = {
-                name: this.customerName,
-                phone: this.customerPhone,
-                lessonIDs: this.cart.map(item => item._id),
-                spaces: this.cart.length
-            };
+const backendUrl = 'https://onrender.com';
+let lessons = [];
+let cart = [];
+let showLessons = true;
 
-            fetch(`${this.backendUrl}/orders`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(orderData)
-            })
-            .then(res => res.json())
-            .then(() => {
-                const updatePromises = this.lessons.map(lesson => {
-                    return fetch(`${this.backendUrl}/lessons/${lesson._id}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ spaces: lesson.spaces })
-                    });
-                });
-                return Promise.all(updatePromises);
-            })
-            .then(() => {
-                alert("Order submitted and spaces updated in MongoDB!");
-                this.cart = [];
-                this.customerName = '';
-                this.customerPhone = '';
-                this.showLessons = true;
-                this.fetchLessons();
-            })
-            .catch(err => console.error("Checkout failed:", err));
-        }
+function fetchLessons() {
+    fetch(`${backendUrl}/lessons`)
+        .then(res => res.json())
+        .then(data => {
+            lessons = data;
+            renderLessons();
+        })
+        .catch(err => {
+            document.getElementById('lessonsGrid').innerHTML = '<p>Waking up Render server... refresh in 30 seconds.</p>';
+        });
+}
+
+function renderLessons() {
+    const sortBy = document.getElementById('sortBy').value;
+    const sortOrder = document.getElementById('sortOrder').value;
+    const sorted = [...lessons].sort((a, b) => {
+        let modifier = sortOrder === 'asc' ? 1 : -1;
+        if (a[sortBy] < b[sortBy]) return -1 * modifier;
+        if (a[sortBy] > b[sortBy]) return 1 * modifier;
+        return 0;
+    });
+
+    const grid = document.getElementById('lessonsGrid');
+    grid.innerHTML = sorted.map(lesson => `
+        <div class="card">
+            <h3>${lesson.subject}</h3>
+            <p><strong>Location:</strong> ${lesson.location}</p>
+            <p><strong>Price:</strong> £${lesson.price}</p>
+            <p><strong>Spaces Left:</strong> ${lesson.spaces}</p>
+            <button class="btn btn-success" ${lesson.spaces === 0 ? 'disabled' : ''} onclick="addToCart('${lesson._id}')">
+                ${lesson.spaces > 0 ? 'Add to Cart' : 'Full'}
+            </button>
+        </div>
+    `).join('');
+}
+
+function addToCart(id) {
+    const lesson = lessons.find(l => l._id === id);
+    if (lesson && lesson.spaces > 0) {
+        lesson.spaces--;
+        cart.push(lesson);
+        updateHeader();
+        renderLessons();
     }
-});
+}
+
+function removeFromCart(index, id) {
+    cart.splice(index, 1);
+    const lesson = lessons.find(l => l._id === id);
+    if (lesson) lesson.spaces++;
+    updateHeader();
+    renderCart();
+    renderLessons();
+}
+
+function updateHeader() {
+    const btn = document.getElementById('cartToggleBtn');
+    btn.disabled = cart.length === 0 && showLessons;
+    btn.textContent = showLessons ? `View Cart (${cart.length})` : 'Back to Courses';
+}
+
+function toggleCart() {
+    showLessons = !showLessons;
+    document.getElementById('lessonsSection').style.display = showLessons ? 'block' : 'none';
+    document.getElementById('cartSection').style.display = showLessons ? 'none' : 'block';
+    updateHeader();
+    if (!showLessons) renderCart();
+}
+
+function renderCart() {
+    const container = document.getElementById('cartItems');
+    const form = document.getElementById('checkoutForm');
+    if (cart.length === 0) {
+        container.innerHTML = '<p>Your cart is empty.</p>';
+        form.style.display = 'none';
+        return;
+    }
+    form.style.display = 'block';
+    container.innerHTML = cart.map((item, idx) => `
+        <div class="cart-item">
+            <div><strong>${item.subject}</strong> - ${item.location} (£${item.price})</div>
+            <button class="btn btn-danger" onclick="removeFromCart(${idx}, '${item._id}')">Remove</button>
+        </div>
+    `).join('');
+}
+
+function validateCheckout() {
+    const name = document.getElementById('customerName').value.trim();
+    const phone = document.getElementById('customerPhone').value.trim();
+    const valid = /^[A-Za-z\s]+$/.test(name) && /^[0-9]+$/.test(phone);
+    document.getElementById('checkoutBtn').disabled = !valid;
+}
+
+function submitCheckout() {
+    const orderData = {
+        name: document.getElementById('customerName').value.trim(),
+        phone: document.getElementById('customerPhone').value.trim(),
+        lessonIDs: cart.map(item => item._id),
+        spaces: cart.length
+    };
+
+    fetch(`${backendUrl}/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderData)
+    })
+    .then(res => res.json())
+    .then(() => Promise.all(lessons.map(lesson =>
+        fetch(`${backendUrl}/lessons/${lesson._id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ spaces: lesson.spaces })
+        })
+    )))
+    .then(() => {
+        alert("Order submitted and spaces updated in MongoDB!");
+        cart = [];
+        document.getElementById('customerName').value = '';
+        document.getElementById('customerPhone').value = '';
+        showLessons = true;
+        document.getElementById('lessonsSection').style.display = 'block';
+        document.getElementById('cartSection').style.display = 'none';
+        updateHeader();
+        fetchLessons();
+    });
+}
+
+fetchLessons();
 </script>
 </body>
-</html><!-- Commit 2: Added sorting controls --><!-- Commit 3 --><!-- Commit 4--><!-- Commit 5--><!-- Commit 6--><!-- Commit 7 --><!-- Commit 8 --><!-- Commit 9 --><!-- Commit 10-->
-
+</html>
